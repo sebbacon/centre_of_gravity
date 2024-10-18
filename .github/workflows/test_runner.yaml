@@ -37,11 +37,11 @@ jobs:
           GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
         run: |
           source .venv/bin/activate
-          pytest -v -m "not integration"
+          pytest -v src -m "not integration"
 
       - name: Run integration tests
         env:
           GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
         run: |
           source .venv/bin/activate
-          pytest -v -m "integration"
+          pytest -v src -m "integration"

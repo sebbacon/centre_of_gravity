@@ -3,7 +3,7 @@ name = "centre-of-gravity"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.8"
 dependencies = [
     "aider-chat>=0.59.1",
     "black>=24.10.0",
@@ -11,6 +11,14 @@ dependencies = [
     "pytest>=8.3.3",
     "python-dotenv>=1.0.1",
 ]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
 [tool.pytest.ini_options]
 markers = [
     "integration: marks tests as integration tests",
