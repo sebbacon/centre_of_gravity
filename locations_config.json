@@ -1,0 +1,12 @@
+{
+    "origins": [
+      {"name": "New York City", "lat": 40.7128, "lon": -74.0060},
+      {"name": "Los Angeles", "lat": 34.0522, "lon": -118.2437},
+      {"name": "Chicago", "lat": 41.8781, "lon": -87.6298}
+    ],
+    "destinations": [
+      {"name": "Philadelphia", "lat": 39.9526, "lon": -75.1652},
+      {"name": "Boston", "lat": 42.3601, "lon": -71.0589},
+      {"name": "San Francisco", "lat": 37.7749, "lon": -122.4194}
+    ]
+  }
