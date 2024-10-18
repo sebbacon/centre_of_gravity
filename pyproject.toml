@@ -1,0 +1,12 @@
+[project]
+name = "centre-of-gravity"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "aider-chat>=0.59.1",
+    "googlemaps>=4.10.0",
+    "pytest>=8.3.3",
+    "python-dotenv>=1.0.1",
+]
