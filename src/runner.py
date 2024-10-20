@@ -2,12 +2,27 @@ import googlemaps
 from datetime import datetime
 from typing import List, Tuple, Dict
 import json
+import sqlite3
 
 
 class BestDestinationFinder:
-    def __init__(self, api_key: str, config_file: str):
+    def __init__(self, api_key: str, config_file: str, db_file: str = "routes.db"):
         self.gmaps = googlemaps.Client(key=api_key)
         self.config = self.load_config(config_file)
+        self.db_file = db_file
+        self.conn = sqlite3.connect(self.db_file)
+        self.cursor = self.conn.cursor()
+        self.init_db()
+
+    def init_db(self):
+        self.cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS routes
+            (origin TEXT, destination TEXT, duration INTEGER,
+            PRIMARY KEY (origin, destination))
+        """
+        )
+        self.conn.commit()
 
     def load_config(self, config_file: str) -> Dict:
         try:
@@ -22,14 +37,33 @@ class BestDestinationFinder:
     def calculate_travel_times(
         self, origins: List[Tuple[float, float]], destination: Tuple[float, float]
     ) -> List[int]:
-        matrix = self.gmaps.distance_matrix(
-            origins,
-            destination,
-            mode="transit",
-            transit_mode="bus|subway|train",
-            arrival_time=datetime.now(),
-        )
-        return [row["elements"][0]["duration"]["value"] for row in matrix["rows"]]
+        travel_times = []
+        for origin in origins:
+            origin_str = f"{origin[0]},{origin[1]}"
+            dest_str = f"{destination[0]},{destination[1]}"
+            self.cursor.execute(
+                "SELECT duration FROM routes WHERE origin = ? AND destination = ?",
+                (origin_str, dest_str),
+            )
+            result = self.cursor.fetchone()
+            if result:
+                travel_times.append(result[0])
+            else:
+                matrix = self.gmaps.distance_matrix(
+                    [origin],
+                    destination,
+                    mode="transit",
+                    transit_mode="bus|subway|train",
+                    arrival_time=datetime.now(),
+                )
+                duration = matrix["rows"][0]["elements"][0]["duration"]["value"]
+                travel_times.append(duration)
+                self.cursor.execute(
+                    "INSERT INTO routes (origin, destination, duration) VALUES (?, ?, ?)",
+                    (origin_str, dest_str, duration),
+                )
+        self.conn.commit()
+        return travel_times
 
     def calculate_convenience_score(self, travel_times: List[int]) -> float:
         avg_time = sum(travel_times) / len(travel_times)
@@ -57,6 +91,9 @@ class BestDestinationFinder:
         if result:
             return result[0]["formatted_address"]
         return "Address not found"
+
+    def close(self):
+        self.conn.close()
 
 
 # Usage
