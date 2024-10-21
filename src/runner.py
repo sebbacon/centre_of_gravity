@@ -45,38 +45,42 @@ class RouteUpdater:
                 dest_str = f"{destination[0]:.2f},{destination[1]:.2f}"
                 route_key = f"{origin_str}->{dest_str}"
 
-                if route_key not in self.routes and origin != dest_str:
-                    try:
-                        next_thursday = datetime.now() + timedelta(
-                            days=(3 - datetime.now().weekday() + 7) % 7
-                        )
-                        next_thursday = next_thursday.replace(
-                            hour=14, minute=0, second=0, microsecond=0
-                        )
-                        matrix = self.gmaps.distance_matrix(
-                            [origin],
-                            destination,
-                            mode="transit",
-                            transit_mode="bus|subway|train",
-                            arrival_time=next_thursday,
-                        )
-                        element = matrix["rows"][0]["elements"][0]
-                        if "duration" in element:
-                            duration = element["duration"]["value"]
-                            print(
-                                f"Transit route found from {origin} to {destination}: {duration}"
+
+                if route_key not in self.routes:
+                    if origin == dest_str:
+                        self.routes[route_key] = 0
+                    else:
+                        try:
+                            next_thursday = datetime.now() + timedelta(
+                                days=(3 - datetime.now().weekday() + 7) % 7
                             )
-                        else:
-                            print(
-                                f"No transit route found from {origin} to {destination}"
+                            next_thursday = next_thursday.replace(
+                                hour=14, minute=0, second=0, microsecond=0
                             )
-                            duration = float("inf")  # Use infinity for no route
-                        self.routes[route_key] = duration
-                    except Exception as e:
-                        print(
-                            f"Error calculating travel time from {origin} to {destination}: {e}"
-                        )
-                        self.routes[route_key] = float("inf")  # Use infinity for errors
+                            matrix = self.gmaps.distance_matrix(
+                                [origin],
+                                destination,
+                                mode="transit",
+                                transit_mode="bus|subway|train",
+                                arrival_time=next_thursday,
+                            )
+                            element = matrix["rows"][0]["elements"][0]
+                            if "duration" in element:
+                                duration = element["duration"]["value"]
+                                print(
+                                    f"Transit route found from {origin} to {destination}: {duration}"
+                                )
+                            else:
+                                print(
+                                    f"No transit route found from {origin} to {destination}"
+                                )
+                                duration = float("inf")  # Use infinity for no route
+                            self.routes[route_key] = duration
+                        except Exception as e:
+                            print(
+                                f"Error calculating travel time from {origin} to {destination}: {e}"
+                            )
+                            self.routes[route_key] = float("inf")  # Use infinity for errors
 
         self.save_routes()
 
