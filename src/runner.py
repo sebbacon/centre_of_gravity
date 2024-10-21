@@ -5,6 +5,8 @@ import json
 import os
 import matplotlib.pyplot as plt
 from collections import Counter
+import json
+import base64
 
 
 class RouteUpdater:
@@ -251,3 +253,50 @@ class BestDestinationFinder:
 
     def close(self):
         pass  # No need to save routes in this class
+
+def build_embedded_html(config_file: str, routes_file: str, output_file: str = "index_embedded.html"):
+    """
+    Build a self-contained HTML file with embedded JSON data.
+    
+    :param config_file: Path to the locations config JSON file
+    :param routes_file: Path to the routes JSON file
+    :param output_file: Path to the output HTML file
+    """
+    with open(config_file, 'r') as f:
+        config_data = json.load(f)
+    
+    with open(routes_file, 'r') as f:
+        routes_data = json.load(f)
+    
+    with open('index.html', 'r') as f:
+        html_template = f.read()
+    
+    # Encode JSON data as base64
+    config_base64 = base64.b64encode(json.dumps(config_data).encode()).decode()
+    routes_base64 = base64.b64encode(json.dumps(routes_data).encode()).decode()
+    
+    # Replace the loadData function in the HTML template
+    embedded_html = html_template.replace(
+        'async function loadData() {',
+        f'''async function loadData() {{
+            const configBase64 = "{config_base64}";
+            const routesBase64 = "{routes_base64}";
+            config = JSON.parse(atob(configBase64));
+            routes = JSON.parse(atob(routesBase64));
+            populateOriginSelect();
+        '''
+    )
+    
+    # Remove fetch calls
+    embedded_html = embedded_html.replace(
+        'const configResponse = await fetch(\'locations_config.json\');',
+        '// Fetch calls removed in embedded version'
+    )
+    embedded_html = embedded_html.replace(
+        'const routesResponse = await fetch(\'routes.json\');',
+        '// Fetch calls removed in embedded version'
+    )
+    
+    with open(output_file, 'w') as f:
+        f.write(embedded_html)
+    return output_file    

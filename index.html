@@ -43,18 +43,7 @@
         let config, routes;
 
         async function loadData() {
-            try {
-                const configResponse = await fetch('locations_config.json');
-                config = await configResponse.json();
-
-                const routesResponse = await fetch('routes.json');
-                routes = await routesResponse.json();
-
-                populateOriginSelect();
-            } catch (error) {
-                console.error('Error loading JSON files:', error);
-                document.getElementById('results').innerHTML = 'Error: Unable to load necessary data.';
-            }
+            // loading stuff goes here
         }
 
         function populateOriginSelect() {
@@ -93,7 +82,7 @@
 
                 const destinations = calculateAllDestinations(originsToUse);
                 const sortedDestinations = destinations.sort((a, b) => a.score - b.score);
-                const topDestinations = sortedDestinations.slice(0, 5);
+                const topDestinations = sortedDestinations.slice(0, 15);
 
                 resultsDiv.innerHTML = '';
                 topDestinations.forEach((destination, index) => {
@@ -105,6 +94,7 @@
                         <p>Convenience Score: ${destination.score.toFixed(2)}</p>
                         <p>Average Travel Time: ${(destination.avgTime / 60).toFixed(2)} minutes</p>
                         <p>Max Travel Time: ${(destination.maxTime / 60).toFixed(2)} minutes</p>
+                        <pre class="histogram">${createHistogram(destination.travelTimes)}</pre>
                     `;
                     resultsDiv.appendChild(destDiv);
                 });
@@ -144,79 +134,35 @@
             return { score, avgTime, maxTime };
         }
 
-        function createHistogram(travelTimes) {
-            const travelTimesMinutes = travelTimes.map(t => Math.floor(t / 60));
-            const bucketSize = Math.max(1, Math.floor((Math.max(...travelTimesMinutes) - Math.min(...travelTimesMinutes)) / 10));
-            const buckets = {};
-        
-            travelTimesMinutes.forEach(time => {
-                const bucket = Math.floor(time / bucketSize) * bucketSize;
-                buckets[bucket] = (buckets[bucket] || 0) + 1;
-            });
-
-            const maxCount = Math.max(...Object.values(buckets));
-            const barChar = '█';
-            let histogramHtml = 'Travel Times Histogram (minutes):\n';
-
-            Object.keys(buckets).sort((a, b) => a - b).forEach(bucket => {
-                const count = buckets[bucket];
-                const barLength = Math.round((count / maxCount) * 20);
-                histogramHtml += `${bucket.toString().padStart(3)}-${(parseInt(bucket) + bucketSize - 1).toString().padEnd(3)} | ${barChar.repeat(barLength)} ${count}\n`;
-            });
-
-            histogramHtml += `Each row represents a ${bucketSize}-minute range\n`;
-            histogramHtml += `Total trips: ${travelTimesMinutes.length}\n`;
-
-            return histogramHtml;
-        }
-
-        async function findBestDestinations() {
-            const resultsDiv = document.getElementById('results');
-            resultsDiv.innerHTML = 'Loading...';
-
-            if (!config || !routes) {
-                await loadData();
-            }
-
-            if (!config || !routes) {
-                resultsDiv.innerHTML = 'Error: Unable to load necessary data.';
-                return;
-            }
-
-            try {
-                const selectedOrigins = $('#originSelect').val();
-                const originsToUse = selectedOrigins && selectedOrigins.length > 0
-                    ? selectedOrigins.map(JSON.parse)
-                    : config.origins;
-
-                const destinations = calculateAllDestinations(originsToUse);
-                const sortedDestinations = destinations.sort((a, b) => a.score - b.score);
-                const topDestinations = sortedDestinations.slice(0, 5);
-
-                resultsDiv.innerHTML = '';
-                topDestinations.forEach((destination, index) => {
-                    const destDiv = document.createElement('div');
-                    destDiv.className = 'destination';
-                    destDiv.innerHTML = `
-                        <h2>${index + 1}. ${destination.name}</h2>
-                        <p>Latitude: ${destination.lat}, Longitude: ${destination.lon}</p>
-                        <p>Convenience Score: ${destination.score.toFixed(2)}</p>
-                        <p>Average Travel Time: ${(destination.avgTime / 60).toFixed(2)} minutes</p>
-                        <p>Max Travel Time: ${(destination.maxTime / 60).toFixed(2)} minutes</p>
-                        <pre class="histogram">${createHistogram(destination.travelTimes)}</pre>
-                    `;
-                    resultsDiv.appendChild(destDiv);
-                });
-            } catch (error) {
-                resultsDiv.innerHTML = 'Error: Unable to calculate best destinations.';
-                console.error('Error:', error);
-            }
-        }
-
         // Initialize Select2 after the document is ready
         $(document).ready(function() {
             loadData();
         });
+
+        function createHistogram(travelTimes) {
+            const numBuckets = 10;
+            const maxTime = Math.max(...travelTimes);
+            const bucketSize = Math.ceil(maxTime / 60 / numBuckets);
+            const buckets = new Array(numBuckets).fill(0);
+
+            travelTimes.forEach(time => {
+                const bucketIndex = Math.min(Math.floor(time / 60 / bucketSize), numBuckets - 1);
+                buckets[bucketIndex]++;
+            });
+
+            const maxCount = Math.max(...buckets);
+            const histogramWidth = 20; // characters wide
+
+            let histogram = '';
+            buckets.forEach((count, i) => {
+                const barLength = Math.round((count / maxCount) * histogramWidth);
+                const bar = '█'.repeat(barLength) + ' '.repeat(histogramWidth - barLength);
+                const startTime = i * bucketSize;
+                const endTime = (i + 1) * bucketSize;
+                histogram += `${startTime.toString().padStart(3, ' ')}-${endTime.toString().padStart(3, ' ')} min: ${bar} ${count}\n`;
+            });
+            return histogram;
+        }
     </script>
 </body>
 </html>
