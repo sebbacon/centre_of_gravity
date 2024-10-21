@@ -6,6 +6,9 @@ on:
       - main
   workflow_dispatch:
 
+env:
+  GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
