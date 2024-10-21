@@ -3,8 +3,6 @@ from datetime import datetime, timedelta
 from typing import List, Tuple, Dict
 import json
 import os
-import matplotlib.pyplot as plt
-from collections import Counter
 import json
 import base64
 import json
@@ -272,25 +270,6 @@ class BestDestinationFinder:
             print(
                 f"Note: {len(travel_times) - len(travel_times_minutes)} routes were not found"
             )
-
-    def plot_destinations(self, destinations: List[Tuple[Dict, float]]):
-        """
-        Plot all possible destinations as a bar chart with convenience scores on the y-axis.
-
-        :param destinations: List of tuples containing destination info and convenience scores
-        """
-        names = [dest["name"] for dest, _ in destinations]
-        scores = [score for _, score in destinations]
-
-        plt.figure(figsize=(12, 6))
-        plt.bar(names, scores)
-        plt.title("Destination Convenience Scores")
-        plt.xlabel("Destinations")
-        plt.ylabel("Convenience Score (lower is better)")
-        plt.xticks(rotation=45, ha="right")
-        plt.tight_layout()
-        plt.savefig("destination_scores.png")
-        plt.close()
 
     def close(self):
         pass  # No need to save routes in this class
