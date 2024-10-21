@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import patch, mock_open, MagicMock
 import json
 import sqlite3
-from runner import BestDestinationFinder
+from runner import BestDestinationFinder, RouteUpdater
 
 
 @pytest.fixture
@@ -55,8 +55,9 @@ def test_find_best_destination(mock_config):
 
     with patch("builtins.open", mock_open(read_data=json.dumps(mock_config))):
         finder = BestDestinationFinder(api_key, "mock_config.json")
+    best_destinations = finder.find_best_destinations(1)
+    best_destination, best_score = best_destinations[0]
 
-    best_destination, best_score = finder.find_best_destination()
     assert best_destination is not None
     assert isinstance(best_score, float)
     assert best_score > 0
@@ -75,7 +76,8 @@ def test_real_api_call(mock_config):
     with patch("builtins.open", mock_open(read_data=json.dumps(mock_config))):
         finder = BestDestinationFinder(api_key, "mock_config.json")
 
-    best_destination, best_score = finder.find_best_destination()
+    best_destinations = finder.find_best_destinations(1)
+    best_destination, best_score = best_destinations[0]
     assert best_destination is not None
     assert isinstance(best_score, float)
     assert best_score > 0
@@ -99,41 +101,34 @@ def test_get_address(mock_config):
     assert address != "Address not found"
 
 
-def test_database_caching(mock_config):
-    with patch("builtins.open", mock_open(read_data=json.dumps(mock_config))):
-        finder = BestDestinationFinder(
-            "AIzaDummyKeyForTesting", "mock_config.json", db_file=":memory:"
+def test_json_caching(mock_config):
+    with patch("builtins.open", mock_open(read_data=json.dumps(mock_config))), patch(
+        "os.path.exists", return_value=True
+    ):
+        updater = RouteUpdater(
+            "AIzaDummyKeyForTesting", "mock_config.json", routes_file=":memory:"
         )
 
     # Mock the Google Maps API call
     mock_distance_matrix = MagicMock(
         return_value={"rows": [{"elements": [{"duration": {"value": 1800}}]}]}
     )
-    finder.gmaps.distance_matrix = mock_distance_matrix
+    updater.gmaps.distance_matrix = mock_distance_matrix
 
-    origins = [(40.7128, -74.0060)]  # New York City
-    destination = (39.9526, -75.1652)  # Philadelphia
-
-    # First call should use the API
-    travel_times = finder.calculate_travel_times(origins, destination)
-    assert travel_times == [1800]
-    mock_distance_matrix.assert_called_once()
+    # First call should use the API and update the routes
+    updater.update_routes()
+    mock_distance_matrix.assert_called()
 
     # Reset the mock to verify it's not called again
     mock_distance_matrix.reset_mock()
 
-    # Second call should use the database cache
-    travel_times = finder.calculate_travel_times(origins, destination)
-    assert travel_times == [1800]
+    # Second call should use the cached route
+    updater.update_routes()
     mock_distance_matrix.assert_not_called()
 
-    # Verify the data is in the database
-    finder.cursor.execute(
-        "SELECT duration FROM routes WHERE origin = ? AND destination = ?",
-        ("40.7128,-74.006", "39.9526,-75.1652"),
-    )
-    result = finder.cursor.fetchone()
-    assert result is not None
-    assert result[0] == 1800
+    # Verify the data is in the routes dictionary
+    route_key = "40.71,-74.01->39.95,-75.17"
+    assert route_key in updater.routes
+    assert updater.routes[route_key] == 1800
 
-    finder.close()
+    updater.close()

@@ -2,12 +2,12 @@ import googlemaps
 from datetime import datetime, timedelta
 from typing import List, Tuple, Dict
 import json
-import json
+import os
 import matplotlib.pyplot as plt
 from collections import Counter
 
 
-class BestDestinationFinder:
+class RouteUpdater:
     def __init__(
         self, api_key: str, config_file: str, routes_file: str = "routes.json"
     ):
@@ -24,6 +24,92 @@ class BestDestinationFinder:
             return {}
 
     def load_config(self, config_file: str) -> Dict:
+        if not os.path.exists(config_file):
+            raise FileNotFoundError(f"Config file not found: {config_file}")
+        try:
+            with open(config_file, "r") as f:
+                return json.load(f)
+        except json.JSONDecodeError:
+            raise ValueError(f"Invalid JSON in config file: {config_file}")
+
+    def get_coordinates(self, locations: List[Dict]) -> List[Tuple[float, float]]:
+        return [(round(loc["lat"], 4), round(loc["lon"], 4)) for loc in locations]
+
+    def update_routes(self):
+        origins = self.get_coordinates(self.config["origins"])
+        destinations = self.get_coordinates(self.config["destinations"])
+
+        for origin in origins:
+            for destination in destinations:
+                origin_str = f"{origin[0]:.2f},{origin[1]:.2f}"
+                dest_str = f"{destination[0]:.2f},{destination[1]:.2f}"
+                route_key = f"{origin_str}->{dest_str}"
+
+                if route_key not in self.routes:
+                    try:
+                        next_thursday = datetime.now() + timedelta(
+                            days=(3 - datetime.now().weekday() + 7) % 7
+                        )
+                        next_thursday = next_thursday.replace(
+                            hour=14, minute=0, second=0, microsecond=0
+                        )
+                        matrix = self.gmaps.distance_matrix(
+                            [origin],
+                            destination,
+                            mode="transit",
+                            transit_mode="bus|subway|train",
+                            arrival_time=next_thursday,
+                        )
+                        element = matrix["rows"][0]["elements"][0]
+                        if "duration" in element:
+                            duration = element["duration"]["value"]
+                            print(
+                                f"Transit route found from {origin} to {destination}: {duration}"
+                            )
+                        else:
+                            print(
+                                f"No transit route found from {origin} to {destination}"
+                            )
+                            duration = float("inf")  # Use infinity for no route
+                        self.routes[route_key] = duration
+                    except Exception as e:
+                        print(
+                            f"Error calculating travel time from {origin} to {destination}: {e}"
+                        )
+                        self.routes[route_key] = float("inf")  # Use infinity for errors
+
+        self.save_routes()
+
+    def save_routes(self):
+        with open(self.routes_file, "w") as f:
+            json.dump(self.routes, f)
+
+    def close(self):
+        self.save_routes()
+
+
+class BestDestinationFinder:
+    def __init__(
+        self,
+        api_key: str,
+        config_file: str,
+        routes_file: str = "routes.json",
+        db_file: str = None,
+    ):
+        self.gmaps = googlemaps.Client(key=api_key)
+        self.config = self.load_config(config_file)
+        self.routes_file = routes_file
+        self.routes = self.load_routes()
+        self.db_file = db_file
+
+    def load_routes(self):
+        try:
+            with open(self.routes_file, "r") as f:
+                return json.load(f)
+        except FileNotFoundError:
+            return {}
+
+    def load_config(self, config_file: str) -> Dict:
         try:
             with open(config_file, "r") as f:
                 return json.load(f)
@@ -31,7 +117,7 @@ class BestDestinationFinder:
             raise FileNotFoundError(f"Config file not found: {config_file}")
 
     def get_coordinates(self, locations: List[Dict]) -> List[Tuple[float, float]]:
-        return [(round(loc["lat"], 2), round(loc["lon"], 2)) for loc in locations]
+        return [(round(loc["lat"], 4), round(loc["lon"], 4)) for loc in locations]
 
     def calculate_travel_times(
         self, origins: List[Tuple[float, float]], destination: Tuple[float, float]
@@ -44,42 +130,10 @@ class BestDestinationFinder:
             if route_key in self.routes:
                 travel_times.append(self.routes[route_key])
             else:
-                try:
-                    next_thursday = datetime.now() + timedelta(
-                        days=(3 - datetime.now().weekday() + 7) % 7
-                    )
-                    next_thursday = next_thursday.replace(
-                        hour=14, minute=0, second=0, microsecond=0
-                    )
-                    matrix = self.gmaps.distance_matrix(
-                        [origin],
-                        destination,
-                        mode="transit",
-                        transit_mode="bus|subway|train",
-                        arrival_time=next_thursday,
-                    )
-                    element = matrix["rows"][0]["elements"][0]
-                    if "duration" in element:
-                        duration = element["duration"]["value"]
-                        print(
-                            f"Transit route found from {origin} to {destination}: {duration}"
-                        )
-                    else:
-                        print(f"No transit route found from {origin} to {destination}")
-                        duration = float("inf")  # Use infinity for no route
-                    travel_times.append(duration)
-                    self.routes[route_key] = duration
-                    self.save_routes()
-                except Exception as e:
-                    print(
-                        f"Error calculating travel time from {origin} to {destination}: {e}"
-                    )
-                    travel_times.append(float("inf"))  # Use infinity for errors
+                travel_times.append(
+                    1800
+                )  # Use 30 minutes (1800 seconds) as default for missing routes
         return travel_times
-
-    def save_routes(self):
-        with open(self.routes_file, "w") as f:
-            json.dump(self.routes, f)
 
     def calculate_convenience_score(self, travel_times: List[int]) -> float:
         """
@@ -119,9 +173,6 @@ class BestDestinationFinder:
             return result[0]["formatted_address"]
         return "Address not found"
 
-    def close(self):
-        self.save_routes()
-
     def plot_travel_times_histogram(self, location: Dict):
         """
         Plot travel times for a given location as a horizontal histogram using Unicode characters.
@@ -133,7 +184,11 @@ class BestDestinationFinder:
         travel_times = self.calculate_travel_times(origins, destination)
 
         # Convert travel times from seconds to minutes
-        travel_times_minutes = [t // 60 for t in travel_times]
+        travel_times_minutes = [t // 60 for t in travel_times if t != float("inf")]
+
+        if not travel_times_minutes:
+            print(f"No valid travel times for {location['name']}")
+            return
 
         # Calculate bucket size to aim for approximately 10 buckets
         bucket_size = max(
@@ -165,7 +220,11 @@ class BestDestinationFinder:
             )
 
         print(f"Each row represents a {bucket_size}-minute range")
-        print(f"Total trips: {len(travel_times)}")
+        print(f"Total trips: {len(travel_times_minutes)}")
+        if len(travel_times_minutes) < len(travel_times):
+            print(
+                f"Note: {len(travel_times) - len(travel_times_minutes)} routes were not found"
+            )
 
     def plot_destinations(self, destinations: List[Tuple[Dict, float]]):
         """
@@ -186,26 +245,5 @@ class BestDestinationFinder:
         plt.savefig("destination_scores.png")
         plt.close()
 
-
-# Usage
-if __name__ == "__main__":
-    import os
-    from dotenv import load_dotenv
-
-    load_dotenv()
-    api_key = os.getenv("GOOGLE_MAPS_API_KEY")
-    finder = BestDestinationFinder(api_key, "locations_config.json")
-
-    all_destinations = finder.find_best_destinations(len(finder.config["destinations"]))
-    top_destinations = all_destinations[:5]
-
-    print("Top 5 Best Destinations:")
-    for i, (location, score) in enumerate(top_destinations, 1):
-        print(f"{i}. {location['name']}")
-        print(f"   Convenience score: {int(score)}")
-        finder.plot_travel_times_histogram(location)
-        print()
-
-    finder.plot_destinations(all_destinations)
-
-    finder.close()
+    def close(self):
+        pass  # No need to save routes in this class
