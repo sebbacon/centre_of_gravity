@@ -7,6 +7,47 @@ import matplotlib.pyplot as plt
 from collections import Counter
 import json
 import base64
+import json
+import ast
+
+def convert_staff_locations(input_file):
+    """Convert data as stored in our current team manual page into a format
+    that can be used by this software"""
+    # Read the input file
+    with open(input_file, 'r') as f:
+        content = f.read()
+    
+    # Remove the 'export default' part and semicolon at the end
+    data_string = content.replace('export default', '').strip()[:-1]
+
+    # Replace JavaScript-style property names with Python-style
+    data_string = data_string.replace('name:', '"name":')
+    data_string = data_string.replace('location:', '"location":')
+    data_string = data_string.replace('github:', '"github":')
+
+    # Use ast.literal_eval to safely evaluate the string as a Python expression
+    data_list = ast.literal_eval(data_string)
+    
+    # Transform the data
+    origins = []
+    for item in data_list:
+        origins.append({
+            "name": item["name"],
+            "lat": item["location"][0],
+            "lon": item["location"][1]
+        })
+    
+    output_data = {"origins": origins}
+    
+    return output_data
+
+def interpolate_staff_locations(input_file):
+    output_data = convert_staff_locations(input_file=input_file)
+    with open("locations_config.json", 'r') as f:
+        content = json.load(f)
+        content.update(output_data)
+    with open("locations_config.json", 'w') as f:
+        json.dump(content, f, indent=2)
 
 
 class RouteUpdater:
