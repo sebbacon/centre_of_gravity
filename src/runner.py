@@ -2,29 +2,26 @@ import googlemaps
 from datetime import datetime, timedelta
 from typing import List, Tuple, Dict
 import json
-import sqlite3
+import json
 import matplotlib.pyplot as plt
 from collections import Counter
 
 
 class BestDestinationFinder:
-    def __init__(self, api_key: str, config_file: str, db_file: str = "routes.db"):
+    def __init__(
+        self, api_key: str, config_file: str, routes_file: str = "routes.json"
+    ):
         self.gmaps = googlemaps.Client(key=api_key)
         self.config = self.load_config(config_file)
-        self.db_file = db_file
-        self.conn = sqlite3.connect(self.db_file)
-        self.cursor = self.conn.cursor()
-        self.init_db()
+        self.routes_file = routes_file
+        self.routes = self.load_routes()
 
-    def init_db(self):
-        self.cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS routes
-            (origin TEXT, destination TEXT, duration INTEGER,
-            PRIMARY KEY (origin, destination))
-        """
-        )
-        self.conn.commit()
+    def load_routes(self):
+        try:
+            with open(self.routes_file, "r") as f:
+                return json.load(f)
+        except FileNotFoundError:
+            return {}
 
     def load_config(self, config_file: str) -> Dict:
         try:
@@ -34,22 +31,18 @@ class BestDestinationFinder:
             raise FileNotFoundError(f"Config file not found: {config_file}")
 
     def get_coordinates(self, locations: List[Dict]) -> List[Tuple[float, float]]:
-        return [(loc["lat"], loc["lon"]) for loc in locations]
+        return [(round(loc["lat"], 2), round(loc["lon"], 2)) for loc in locations]
 
     def calculate_travel_times(
         self, origins: List[Tuple[float, float]], destination: Tuple[float, float]
     ) -> List[int]:
         travel_times = []
         for origin in origins:
-            origin_str = f"{origin[0]},{origin[1]}"
-            dest_str = f"{destination[0]},{destination[1]}"
-            self.cursor.execute(
-                "SELECT duration FROM routes WHERE origin = ? AND destination = ?",
-                (origin_str, dest_str),
-            )
-            result = self.cursor.fetchone()
-            if result:
-                travel_times.append(result[0])
+            origin_str = f"{origin[0]:.2f},{origin[1]:.2f}"
+            dest_str = f"{destination[0]:.2f},{destination[1]:.2f}"
+            route_key = f"{origin_str}->{dest_str}"
+            if route_key in self.routes:
+                travel_times.append(self.routes[route_key])
             else:
                 try:
                     next_thursday = datetime.now() + timedelta(
@@ -75,17 +68,18 @@ class BestDestinationFinder:
                         print(f"No transit route found from {origin} to {destination}")
                         duration = float("inf")  # Use infinity for no route
                     travel_times.append(duration)
-                    self.cursor.execute(
-                        "INSERT INTO routes (origin, destination, duration) VALUES (?, ?, ?)",
-                        (origin_str, dest_str, duration),
-                    )
+                    self.routes[route_key] = duration
+                    self.save_routes()
                 except Exception as e:
                     print(
                         f"Error calculating travel time from {origin} to {destination}: {e}"
                     )
                     travel_times.append(float("inf"))  # Use infinity for errors
-        self.conn.commit()
         return travel_times
+
+    def save_routes(self):
+        with open(self.routes_file, "w") as f:
+            json.dump(self.routes, f)
 
     def calculate_convenience_score(self, travel_times: List[int]) -> float:
         """
@@ -119,13 +113,14 @@ class BestDestinationFinder:
         return sorted(all_destinations, key=lambda x: x[1])[:top_n]
 
     def get_address(self, lat_lng: Tuple[float, float]) -> str:
-        result = self.gmaps.reverse_geocode(lat_lng)
+        rounded_lat_lng = (round(lat_lng[0], 2), round(lat_lng[1], 2))
+        result = self.gmaps.reverse_geocode(rounded_lat_lng)
         if result:
             return result[0]["formatted_address"]
         return "Address not found"
 
     def close(self):
-        self.conn.close()
+        self.save_routes()
 
     def plot_travel_times_histogram(self, location: Dict):
         """
