@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Best Destinations Finder</title>
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        #results {
+            margin-top: 20px;
+        }
+        .destination {
+            margin-bottom: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        #originSelect {
+            width: 100%;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Best Destinations Finder</h1>
+    <select id="originSelect" multiple="multiple"></select>
+    <button id="findButton">Find Best Destinations</button>
+    <div id="results"></div>
+
+    <script>
+        let config, routes;
+
+        async function loadData() {
+            try {
+                const configResponse = await fetch('locations_config.json');
+                config = await configResponse.json();
+
+                const routesResponse = await fetch('routes.json');
+                routes = await routesResponse.json();
+
+                populateOriginSelect();
+            } catch (error) {
+                console.error('Error loading JSON files:', error);
+                document.getElementById('results').innerHTML = 'Error: Unable to load necessary data.';
+            }
+        }
+
+        function populateOriginSelect() {
+            const select = $('#originSelect');
+            select.empty();
+            config.origins.forEach(origin => {
+                select.append(new Option(origin.name, JSON.stringify(origin)));
+            });
+            select.select2({
+                placeholder: 'Select origins (default: all)',
+                allowClear: true
+            });
+            select.val(null).trigger('change');
+        }
+
+        document.getElementById('findButton').addEventListener('click', findBestDestinations);
+
+        async function findBestDestinations() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = 'Loading...';
+
+            if (!config || !routes) {
+                await loadData();
+            }
+
+            if (!config || !routes) {
+                resultsDiv.innerHTML = 'Error: Unable to load necessary data.';
+                return;
+            }
+
+            try {
+                const selectedOrigins = $('#originSelect').val();
+                const originsToUse = selectedOrigins && selectedOrigins.length > 0
+                    ? selectedOrigins.map(JSON.parse)
+                    : config.origins;
+
+                const destinations = calculateAllDestinations(originsToUse);
+                const sortedDestinations = destinations.sort((a, b) => a.score - b.score);
+                const topDestinations = sortedDestinations.slice(0, 5);
+
+                resultsDiv.innerHTML = '';
+                topDestinations.forEach((destination, index) => {
+                    const destDiv = document.createElement('div');
+                    destDiv.className = 'destination';
+                    destDiv.innerHTML = `
+                        <h2>${index + 1}. ${destination.name}</h2>
+                        <p>Latitude: ${destination.lat}, Longitude: ${destination.lon}</p>
+                        <p>Convenience Score: ${destination.score.toFixed(2)}</p>
+                        <p>Average Travel Time: ${(destination.avgTime / 60).toFixed(2)} minutes</p>
+                        <p>Max Travel Time: ${(destination.maxTime / 60).toFixed(2)} minutes</p>
+                    `;
+                    resultsDiv.appendChild(destDiv);
+                });
+            } catch (error) {
+                resultsDiv.innerHTML = 'Error: Unable to calculate best destinations.';
+                console.error('Error:', error);
+            }
+        }
+
+        function calculateAllDestinations(origins) {
+            return config.destinations.map(dest => {
+                const travelTimes = calculateTravelTimes(dest, origins);
+                const { score, avgTime, maxTime } = calculateConvenienceScore(travelTimes);
+                return {
+                    name: dest.name,
+                    lat: dest.lat,
+                    lon: dest.lon,
+                    score: score,
+                    avgTime: avgTime,
+                    maxTime: maxTime
+                };
+            });
+        }
+
+        function calculateTravelTimes(destination, origins) {
+            return origins.map(origin => {
+                const routeKey = `${origin.lat.toFixed(2)},${origin.lon.toFixed(2)}->${destination.lat.toFixed(2)},${destination.lon.toFixed(2)}`;
+                return routes[routeKey] || 1800; // Default to 30 minutes if route not found
+            });
+        }
+
+        function calculateConvenienceScore(travelTimes) {
+            const avgTime = travelTimes.reduce((sum, time) => sum + time, 0) / travelTimes.length;
+            const maxTime = Math.max(...travelTimes);
+            const score = avgTime * 0.7 + maxTime * 0.3;
+            return { score, avgTime, maxTime };
+        }
+
+        // Initialize Select2 after the document is ready
+        $(document).ready(function() {
+            loadData();
+        });
+    </script>
+</body>
+</html>
