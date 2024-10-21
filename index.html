@@ -35,6 +35,21 @@
 </head>
 <body>
     <h1>Best Destinations Finder</h1>
+    <p> 
+        Rank possible destinations using a convenience score based on travel times.
+    </p>
+    <p>
+        This score is a weighted combination of the average travel time (70% weight)
+        and the maximum travel time (30% weight). This approach balances overall
+        convenience for the group with fairness to the person with the longest journey.
+    </p>
+    <p>
+        A lower score indicates a more convenient location.
+    </p>
+    <p>
+        The possible destinations are picked from a manually curated list of about 40 transport hubs in England that
+        also have things like conference centres.  Add more by editing `locations_config.json`
+    </p>
     <select id="originSelect" multiple="multiple"></select>
     <button id="findButton">Find Best Destinations</button>
     <div id="results"></div>

@@ -1,3 +1,32 @@
+This app was mostly made by talking with Anthropic's Claude using my voice while walking to the office. This README is therefore a bit random, as it was generated during that walk.
+
+Here's how it works:
+
+Get a Google Maps API Key (see below).
+
+Get people.js, our canonical source of locations:
+
+    curl -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+               -H "Accept: application/vnd.github.v3.raw" \
+               -o people.js \
+               https://raw.githubusercontent.com/ebmdatalab/team-manual/refs/heads/main/team-map/people.js
+
+See if our version of it in this repo (locations_config.json) needs updating:
+
+    python src/cli.py update-locations --source-file people.js
+
+Update travel time data (uses Google Maps API):
+
+    python src/cli.py update-routes
+
+Build a single-page app that uses this data:
+
+    python src/cli.py build-html
+
+All the above steps are supposedly exercised by the build-and-release.yml Github Workflow, so in theory this could run standalong (but it needs a PAT or similar for the `curl` step to work).
+
+The idea is that an extra step would be added to the end of the workflow to upload the resulting HTML page to the team manual.
+
 # UV Setup, Project Dependencies, GitHub CI Guide, and Google Maps API Setup
 
 [Previous content remains unchanged]
@@ -113,6 +142,7 @@ requires-python = ">=3.8"
 dependencies = [
     "googlemaps",
     "python-dotenv",
+    "sqlite3",
 ]
 
 [project.optional-dependencies]
