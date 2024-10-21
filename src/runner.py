@@ -4,6 +4,7 @@ from typing import List, Tuple, Dict
 import json
 import sqlite3
 import matplotlib.pyplot as plt
+from collections import Counter
 
 
 class BestDestinationFinder:
@@ -126,6 +127,51 @@ class BestDestinationFinder:
     def close(self):
         self.conn.close()
 
+    def plot_travel_times_histogram(self, location: Dict):
+        """
+        Plot travel times for a given location as a horizontal histogram using Unicode characters.
+
+        :param location: Dictionary containing location information (lat, lon, name)
+        """
+        origins = self.get_coordinates(self.config["origins"])
+        destination = (location["lat"], location["lon"])
+        travel_times = self.calculate_travel_times(origins, destination)
+
+        # Convert travel times from seconds to minutes
+        travel_times_minutes = [t // 60 for t in travel_times]
+
+        # Calculate bucket size to aim for approximately 10 buckets
+        bucket_size = max(
+            1, (max(travel_times_minutes) - min(travel_times_minutes)) // 10
+        )
+
+        # Create buckets
+        buckets = {}
+        for time in travel_times_minutes:
+            bucket = (time // bucket_size) * bucket_size
+            buckets[bucket] = buckets.get(bucket, 0) + 1
+
+        # Find the maximum count for scaling
+        max_count = max(buckets.values())
+
+        # Define Unicode characters for the bars
+        bar_char = "█"
+
+        print(f"Travel Times to {location['name']} (minutes):")
+
+        # Print the histogram
+        for bucket in sorted(buckets.keys()):
+            count = buckets[bucket]
+            bar_length = int(
+                (count / max_count) * 20
+            )  # Scale to max width of 20 characters
+            print(
+                f"{bucket:3d}-{bucket+bucket_size-1:<3d} | {bar_char * bar_length} {count}"
+            )
+
+        print(f"Each row represents a {bucket_size}-minute range")
+        print(f"Total trips: {len(travel_times)}")
+
     def plot_destinations(self, destinations: List[Tuple[Dict, float]]):
         """
         Plot all possible destinations as a bar chart with convenience scores on the y-axis.
@@ -160,13 +206,11 @@ if __name__ == "__main__":
 
     print("Top 5 Best Destinations:")
     for i, (location, score) in enumerate(top_destinations, 1):
-        print(f"{i}. {location['name']} ({location['lat']}, {location['lon']})")
-        print(f"   Convenience score: {score}")
-        address = finder.get_address((location["lat"], location["lon"]))
-        print(f"   Address: {address}")
+        print(f"{i}. {location['name']}")
+        print(f"   Convenience score: {int(score)}")
+        finder.plot_travel_times_histogram(location)
         print()
 
     finder.plot_destinations(all_destinations)
-    print("A bar chart of all destinations has been saved as 'destination_scores.png'")
 
     finder.close()
