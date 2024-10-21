@@ -45,7 +45,7 @@ class RouteUpdater:
                 dest_str = f"{destination[0]:.2f},{destination[1]:.2f}"
                 route_key = f"{origin_str}->{dest_str}"
 
-                if route_key not in self.routes:
+                if route_key not in self.routes and origin != dest_str:
                     try:
                         next_thursday = datetime.now() + timedelta(
                             days=(3 - datetime.now().weekday() + 7) % 7
