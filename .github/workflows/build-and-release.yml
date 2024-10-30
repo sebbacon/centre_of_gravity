@@ -95,11 +95,11 @@ jobs:
       - name: Check for HTML changes
         id: check_html_changes
         run: |
-          if git diff --exit-code index_embedded.html; then
-            echo "No changes detected in index_embedded.html"
+          if git diff --exit-code location_finder.html; then
+            echo "No changes detected in location_finder.html"
             echo "::set-output name=html_changed::false"
           else
-            echo "Changes detected in index_embedded.html"
+            echo "Changes detected in location_finder.html"
             echo "::set-output name=html_changed::true"
           fi
 
@@ -108,6 +108,6 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add index_embedded.html
-          git commit -m "Update index_embedded.html"
+          git add location_finder.html
+          git commit -m "Update location_finder.html"
           git push

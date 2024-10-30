@@ -8,43 +8,47 @@ import base64
 import json
 import ast
 
+
 def convert_staff_locations(input_file):
     """Convert data as stored in our current team manual page into a format
     that can be used by this software"""
     # Read the input file
-    with open(input_file, 'r') as f:
+    with open(input_file, "r") as f:
         content = f.read()
-    
+
     # Remove the 'export default' part and semicolon at the end
-    data_string = content.replace('export default', '').strip()[:-1]
+    data_string = content.replace("export default", "").strip()[:-1]
 
     # Replace JavaScript-style property names with Python-style
-    data_string = data_string.replace('name:', '"name":')
-    data_string = data_string.replace('location:', '"location":')
-    data_string = data_string.replace('github:', '"github":')
+    data_string = data_string.replace("name:", '"name":')
+    data_string = data_string.replace("location:", '"location":')
+    data_string = data_string.replace("github:", '"github":')
 
     # Use ast.literal_eval to safely evaluate the string as a Python expression
     data_list = ast.literal_eval(data_string)
-    
+
     # Transform the data
     origins = []
     for item in data_list:
-        origins.append({
-            "name": item["name"],
-            "lat": item["location"][0],
-            "lon": item["location"][1]
-        })
-    
+        origins.append(
+            {
+                "name": item["name"],
+                "lat": item["location"][0],
+                "lon": item["location"][1],
+            }
+        )
+
     output_data = {"origins": origins}
-    
+
     return output_data
+
 
 def interpolate_staff_locations(input_file):
     output_data = convert_staff_locations(input_file=input_file)
-    with open("locations_config.json", 'r') as f:
+    with open("locations_config.json", "r") as f:
         content = json.load(f)
         content.update(output_data)
-    with open("locations_config.json", 'w') as f:
+    with open("locations_config.json", "w") as f:
         json.dump(content, f, indent=2)
 
 
@@ -86,7 +90,6 @@ class RouteUpdater:
                 dest_str = f"{destination[0]:.2f},{destination[1]:.2f}"
                 route_key = f"{origin_str}->{dest_str}"
 
-
                 if route_key not in self.routes:
                     if origin == dest_str:
                         self.routes[route_key] = 0
@@ -121,7 +124,9 @@ class RouteUpdater:
                             print(
                                 f"Error calculating travel time from {origin} to {destination}: {e}"
                             )
-                            self.routes[route_key] = float("inf")  # Use infinity for errors
+                            self.routes[route_key] = float(
+                                "inf"
+                            )  # Use infinity for errors
 
         self.save_routes()
 
@@ -274,49 +279,52 @@ class BestDestinationFinder:
     def close(self):
         pass  # No need to save routes in this class
 
-def build_embedded_html(config_file: str, routes_file: str, output_file: str = "index_embedded.html"):
+
+def build_embedded_html(
+    config_file: str, routes_file: str, output_file: str = "location_finder.html"
+):
     """
     Build a self-contained HTML file with embedded JSON data.
-    
+
     :param config_file: Path to the locations config JSON file
     :param routes_file: Path to the routes JSON file
     :param output_file: Path to the output HTML file
     """
-    with open(config_file, 'r') as f:
+    with open(config_file, "r") as f:
         config_data = json.load(f)
-    
-    with open(routes_file, 'r') as f:
+
+    with open(routes_file, "r") as f:
         routes_data = json.load(f)
-    
-    with open('index.html', 'r') as f:
+
+    with open("index.html", "r") as f:
         html_template = f.read()
-    
+
     # Encode JSON data as base64
     config_base64 = base64.b64encode(json.dumps(config_data).encode()).decode()
     routes_base64 = base64.b64encode(json.dumps(routes_data).encode()).decode()
-    
+
     # Replace the loadData function in the HTML template
     embedded_html = html_template.replace(
-        'async function loadData() {',
-        f'''async function loadData() {{
+        "async function loadData() {",
+        f"""async function loadData() {{
             const configBase64 = "{config_base64}";
             const routesBase64 = "{routes_base64}";
             config = JSON.parse(atob(configBase64));
             routes = JSON.parse(atob(routesBase64));
             populateOriginSelect();
-        '''
+        """,
     )
-    
+
     # Remove fetch calls
     embedded_html = embedded_html.replace(
-        'const configResponse = await fetch(\'locations_config.json\');',
-        '// Fetch calls removed in embedded version'
+        "const configResponse = await fetch('locations_config.json');",
+        "// Fetch calls removed in embedded version",
     )
     embedded_html = embedded_html.replace(
-        'const routesResponse = await fetch(\'routes.json\');',
-        '// Fetch calls removed in embedded version'
+        "const routesResponse = await fetch('routes.json');",
+        "// Fetch calls removed in embedded version",
     )
-    
-    with open(output_file, 'w') as f:
+
+    with open(output_file, "w") as f:
         f.write(embedded_html)
-    return output_file    
+    return output_file

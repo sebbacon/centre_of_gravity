@@ -1,7 +1,12 @@
 import argparse
 import os
 from dotenv import load_dotenv
-from runner import BestDestinationFinder, RouteUpdater, interpolate_staff_locations, build_embedded_html
+from runner import (
+    BestDestinationFinder,
+    RouteUpdater,
+    interpolate_staff_locations,
+    build_embedded_html,
+)
 
 
 def main():
@@ -11,13 +16,14 @@ def main():
     parser = argparse.ArgumentParser(description="Meeting Location Finder")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
-
     # Update locations command
     update_locations_parser = subparsers.add_parser(
         "update-locations", help="Update locations from file"
     )
     update_locations_parser.add_argument(
-        "--source-file", default="people.js", help="Path to the source json for people locations"
+        "--source-file",
+        default="people.js",
+        help="Path to the source json for people locations",
     )
 
     # Update routes subcommand
@@ -50,7 +56,7 @@ def main():
         "--routes", default="routes.json", help="Path to the routes file"
     )
     build_html_parser.add_argument(
-        "--output", default="index_embedded.html", help="Path to the output HTML file"
+        "--output", default="location_finder.html", help="Path to the output HTML file"
     )
 
     args = parser.parse_args()
@@ -59,7 +65,11 @@ def main():
         print("Error: GOOGLE_MAPS_API_KEY environment variable is not set.")
         return
 
-    if args.command != "build-html" and args.command != "update-locations" and not os.path.exists(args.config):
+    if (
+        args.command != "build-html"
+        and args.command != "update-locations"
+        and not os.path.exists(args.config)
+    ):
         print(f"Error: Config file not found: {args.config}")
         print("Please make sure the config file exists and the path is correct.")
         return
