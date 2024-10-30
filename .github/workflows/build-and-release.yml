@@ -35,7 +35,7 @@ jobs:
 
       - name: Fetch people.js
         run: |
-          curl -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+          curl -H "Authorization: token ${{ secrets.REPO_RW_PAT }}" \
                -H "Accept: application/vnd.github.v3.raw" \
                -o people.js \
                https://raw.githubusercontent.com/ebmdatalab/team-manual/refs/heads/main/team-map/people.js
