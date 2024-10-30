@@ -111,3 +111,18 @@ jobs:
           git add location_finder.html
           git commit -m "Update location_finder.html"
           git push
+
+      - name: Create PR for location_finder update
+        if: steps.check_html_changes.outputs.html_changed == 'true'
+        run: |
+          BRANCH="update-location-finder-$(date +%s)"
+          gh repo clone ebmdatalab/team-manual /tmp/team-manual
+          cd /tmp/team-manual
+          git checkout -b $BRANCH
+          cp $GITHUB_WORKSPACE/location_finder.html team-map/
+          git add team-map/location_finder.html
+          git commit -m "Update location_finder.html from ${{ github.repository }}"
+          git push origin $BRANCH
+          gh pr create --title "Update location_finder.html" \
+                      --body "Updated from ${{ github.repository }} workflow" \
+                      --repo ebmdatalab/team-manual
